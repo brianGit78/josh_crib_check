@@ -34,13 +34,18 @@ def main():
         try:
             if not cap.isOpened():
                 print("Reconnecting to the stream...")
+                cap.release()
+                cv2.destroyAllWindows()
                 cap = cv2.VideoCapture(creds.rtsp_url)
                 time.sleep(5)  # Wait before retrying
 
             ret, frame = cap.read()
             if not ret:
                 print("Failed to read frame. Retrying...")
+                cap.release()
+                cv2.destroyAllWindows()
                 time.sleep(5)  # Wait before retrying
+                cap = cv2.VideoCapture(creds.rtsp_url)
                 continue
 
             # Preprocess the frame as done during training
