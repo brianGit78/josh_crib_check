@@ -1,0 +1,7 @@
+training_data
+validation_data
+models
+creds.py
+*.keras
+*.h5
+__pycache__
