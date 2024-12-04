@@ -23,21 +23,25 @@ file_manager.remove_model_file()
 # Optional: Set TensorFlow to not use GPU
 os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
-# Data generator for training
+# Data generator for training with enhanced augmentation
 train_datagen = ImageDataGenerator(
     rescale=1./255,
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.2,
-    zoom_range=0.2,
+    rotation_range=30,  # Increased rotation range
+    width_shift_range=0.3,  # Increased width shift range
+    height_shift_range=0.3,  # Increased height shift range
+    shear_range=0.3,  # Increased shear range
+    zoom_range=0.3,  # Increased zoom range
     horizontal_flip=True,
+    vertical_flip=True,  # Added vertical flip
     fill_mode='nearest'
 )
 
+# Resize images to a smaller size
+target_size = (256, 256)
+
 train_generator = train_datagen.flow_from_directory(
-    file_manager.local_path_training_data,  # path to classified training images
-    target_size=(150, 150),
+    directory=creds.local_path,
+    target_size=target_size,
     batch_size=32,
     class_mode='binary'
 )
@@ -47,30 +51,28 @@ validation_datagen = ImageDataGenerator(rescale=1./255)
 
 validation_generator = validation_datagen.flow_from_directory(
     file_manager.local_path_validation_data,  # Path to your validation data
-    target_size=(150, 150),
+    target_size=target_size,
     batch_size=32,
     class_mode='binary'
 )
 
 # Define the model
 model = Sequential([
-    Input(shape=(150, 150, 3)),
-    Conv2D(32, (3, 3), activation='relu'),
-    MaxPooling2D(2, 2),
+    Conv2D(32, (3, 3), activation='relu', input_shape=(256, 256, 3)),
+    MaxPooling2D(pool_size=(2, 2)),
     Conv2D(64, (3, 3), activation='relu'),
-    MaxPooling2D(2, 2),
+    MaxPooling2D(pool_size=(2, 2)),
     Conv2D(128, (3, 3), activation='relu'),
-    MaxPooling2D(2, 2),
+    MaxPooling2D(pool_size=(2, 2)),
     Flatten(),
-    Dense(512, activation='relu'),
-    Dropout(0.5),
+    Dense(128, activation='relu'),
     Dense(1, activation='sigmoid')
 ])
 
 # Compile the model
 model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-# Train the modelServer12345#
+# Train the model
 
 # Define early stopping callback
 # this prevents the model from overfitting by monitoring the validation loss if it does not improve in 5 passes

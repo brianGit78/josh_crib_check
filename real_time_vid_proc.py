@@ -12,7 +12,7 @@ josh_alert = JoshAlert()
 
 def preprocess_frame(frame):
     # Resize the frame
-    frame = cv2.resize(frame, (150, 150))
+    frame = cv2.resize(frame, (256, 256))
     
     # Normalize pixel values if needed (e.g., divide by 255)
     frame = frame / 255.0
