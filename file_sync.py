@@ -8,8 +8,8 @@ class FileManager:
         self.remote_host = remote_host
         self.remote_path = remote_path
         self.local_path = local_path_root
-        self.local_path_training_data = f"{local_path_root}/training_data/"
-        self.local_path_validation_data = f"{local_path_root}/validation_data/"
+        self.local_path_training_data = os.path.join(local_path_root, "training_data")
+        self.local_path_validation_data = os.path.join(local_path_root, "validation_data")
         self.remote_path_training_data = f"{remote_path}/training_data/"
         self.remote_path_validation_data = f"{remote_path}/validation_data/"
         self.model_file_path = f"{local_path_root}/crib_model.keras"

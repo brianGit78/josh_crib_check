@@ -13,62 +13,58 @@ josh_alert = JoshAlert()
 def preprocess_frame(frame):
     # Resize the frame
     frame = cv2.resize(frame, (256, 256))
-    
-    # Normalize pixel values if needed (e.g., divide by 255)
+    # Normalize pixel values
     frame = frame / 255.0
-    
-    # Expand dimensions to match the model's input
-    frame = np.expand_dims(frame, axis=0)
-    
-    return frame
+    # Expand dimensions to match model input (batch of 1)
+    return np.expand_dims(frame, axis=0)
 
+def connect_stream(url):
+    """Attempt to connect to the video stream and return the capture object."""
+    cap = cv2.VideoCapture(url)
+    if not cap.isOpened():
+        print("Failed to connect to the stream. Retrying in 5 seconds...")
+        time.sleep(5)
+        return connect_stream(url)
+    return cap
 
 def main():
-    # Initialize video stream
-    cap = cv2.VideoCapture(creds.rtsp_url)
-
-    # Set the interval for checking the stream (in seconds)
+    cap = connect_stream(creds.rtsp_url)
     check_interval = 3
+    threshold = 0.5  # Prediction threshold for deciding if Josh is in the crib
 
     while True:
         try:
-            if not cap.isOpened():
-                print("Reconnecting to the stream...")
-                cap.release()
-                cv2.destroyAllWindows()
-                cap = cv2.VideoCapture(creds.rtsp_url)
-                time.sleep(5)  # Wait before retrying
-
+            # Attempt to read a frame
             ret, frame = cap.read()
             if not ret:
-                print("Failed to read frame. Retrying...")
+                print("Failed to read frame. Reconnecting...")
                 cap.release()
-                cv2.destroyAllWindows()
-                time.sleep(5)  # Wait before retrying
-                cap = cv2.VideoCapture(creds.rtsp_url)
+                cap = connect_stream(creds.rtsp_url)
                 continue
 
-            # Preprocess the frame as done during training
-            processed_frame = preprocess_frame(frame)  # Implement this function based on your training preprocessing
-            
-            # Predict
-            prediction = model.predict(processed_frame)
-            if prediction[0] > 0.5:  # Assuming 1 is 'true' for son in crib
-                josh_alert.turn_on_helper()  # Son is in the crib
-                print(f"Josh is IN the crib - Prediction: {prediction[0]}")
+            # Preprocess frame and predict
+            processed_frame = preprocess_frame(frame)
+            prediction = model.predict(processed_frame, verbose=0)[0][0]
+
+            # Toggle alert based on prediction
+            if prediction > threshold:
+                josh_alert.turn_on_helper()
+                print(f"Josh is IN the crib - Prediction: {prediction:.4f}")
             else:
-                josh_alert.turn_off_helper()  # Son is not in the crib
-                print(f"Josh is NOT in the crib - Prediction: {prediction[0]}")
-            
-            # Wait for the next interval
+                josh_alert.turn_off_helper()
+                print(f"Josh is NOT in the crib - Prediction: {prediction:.4f}")
+
+            # Wait before next check
             time.sleep(check_interval)
 
         except Exception as e:
             print(f"An error occurred: {e}")
-            time.sleep(5)  # Wait before retrying
+            print("Retrying in 5 seconds...")
+            time.sleep(5)
+            cap.release()
+            cap = connect_stream(creds.rtsp_url)
 
     cap.release()
-    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     main()
