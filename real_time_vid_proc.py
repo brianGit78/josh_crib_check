@@ -11,12 +11,16 @@ model = load_model('/home/brian/josh_crib_check/crib_model.keras')
 josh_alert = JoshAlert()
 
 def preprocess_frame(frame):
-    # Resize the frame
+    # 1. Resize to match training size
     frame = cv2.resize(frame, (256, 256))
-    # Normalize pixel values
-    frame = frame / 255.0
-    # Expand dimensions to match model input (batch of 1)
-    return np.expand_dims(frame, axis=0)
+    
+    # 2. Rescale pixel values from [0, 255] to [0, 1]
+    frame = frame.astype("float32") / 255.0
+
+    # 3. Expand dims to create a batch of one image
+    frame = np.expand_dims(frame, axis=0)
+    
+    return frame
 
 def connect_stream(url):
     """Attempt to connect to the video stream and return the capture object."""

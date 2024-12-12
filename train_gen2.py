@@ -62,6 +62,7 @@ train_generator = train_datagen.flow_from_directory(
     batch_size=batch_size,
     class_mode='binary'
 )
+print(train_generator.class_indices)
 
 validation_generator = validation_datagen.flow_from_directory(
     file_manager.local_path_validation_data,
