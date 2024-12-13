@@ -1,18 +1,13 @@
-import os, subprocess, shutil, secrets, pexpect
+import os, shutil, secrets, pexpect
 
 class FileManager:
-    def __init__(self, remote_user, remote_password, remote_host, remote_path, local_path_root):
-        self.remote_user = remote_user
-        self.remote_password = remote_password
-        self.remote_host = remote_host
-        self.remote_path = remote_path
-        self.local_path = local_path_root
-        self.local_path_training_data = os.path.join(local_path_root, "training_data")
-        self.local_path_validation_data = os.path.join(local_path_root, "validation_data")
-        self.remote_path_training_data = f"{remote_path}/training_data/"
-        #self.remote_path_validation_data = f"{remote_path}/validation_data/"
-        self.model_file_path = f"{local_path_root}/crib_model.keras"
-
+    def __init__(self, model_name):
+        self.local_path = os.getcwd()
+        self.local_path_training_data = os.path.join(self.local_path, "training_data")
+        self.local_path_validation_data = os.path.join(self.local_path, "validation_data")
+        self.model_file_path = os.path.join(self.local_path, model_name)
+        self.create_local_directories()
+        
     def create_local_directories(self):
         if not os.path.exists(self.local_path_training_data):
             os.makedirs(self.local_path_training_data)
@@ -27,16 +22,16 @@ class FileManager:
         else:
             print(f"Model File not found: {self.model_file_path}")
 
-    def start_sync_source(self):
-            rsync_cmd = f"rsync -avz --delete  --exclude 'thumbs.db' --exclude 'Thumbs.db' {self.remote_user}@{self.remote_host}:{self.remote_path_training_data} {self.local_path_training_data}"
-            try:
-                child = pexpect.spawn(rsync_cmd)
-                child.expect('password:')
-                child.sendline(self.remote_password)
-                child.interact()
-                print("Directory successfully synchronized.")
-            except pexpect.exceptions.ExceptionPexpect as e:
-                print("An error occurred while synchronizing directories:", e)
+    def sync_source(self, remote_user, remote_password, remote_host, remote_path):
+        rsync_cmd = f"rsync -avz --delete  --exclude 'thumbs.db' --exclude 'Thumbs.db' {remote_user}@{remote_host}:{remote_path}/ {self.local_path_training_data}/"
+        try:
+            child = pexpect.spawn(rsync_cmd)
+            child.expect('password:')
+            child.sendline(remote_password)
+            child.interact()
+            print("Directory successfully synchronized.")
+        except pexpect.exceptions.ExceptionPexpect as e:
+            print("An error occurred while synchronizing directories:", e)
 
     def split_data_for_validation(self, source_dir, val_dir, val_ratio=0.2):
         """
@@ -69,30 +64,3 @@ class FileManager:
             shutil.move(source_path, dest_path)
 
         print(f"Moved {val_count} files from {source_dir} to {val_dir} with high-entropy randomness.")
-
-    def remove_validation_files_from_training_data(self):
-        validation_files = []
-        
-        # Walk through the validation data directory and collect all file paths
-        for root, dirs, files in os.walk(self.local_path_validation_data):
-            for file in files:
-                validation_files.append(os.path.relpath(os.path.join(root, file), self.local_path_validation_data))
-        
-        # Remove the collected files from the training data directory
-        for file in validation_files:
-            training_file_path = os.path.join(self.local_path_training_data, file)
-            if os.path.exists(training_file_path):
-                os.remove(training_file_path)
-                print(f"Removed: {training_file_path}")
-            else:
-                print(f"File not found: {training_file_path}")
-
-        # remove thumbs.db files
-        for root, dirs, files in os.walk(self.local_path_training_data):
-            for file in files:
-                if file == "Thumbs.db":
-                    os.remove(os.path.join(root, file))
-                    print(f"Removed: {os.path.join(root, file)}")
-
-
-            

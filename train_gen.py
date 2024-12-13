@@ -6,19 +6,9 @@ from tensorflow.keras.callbacks import EarlyStopping
 from file_sync import FileManager
 import creds
 
-# Keep FileManager functionality as requested
-file_manager = FileManager(
-    creds.nas_user,
-    creds.nas_password,
-    creds.nas_conn,
-    creds.nas_path_td_src,
-    creds.local_path
-)
-
-# Prepare local directories and sync data
-file_manager.create_local_directories()
-file_manager.start_sync_source()
-#file_manager.remove_validation_files_from_training_data()
+#file operations
+file_manager = FileManager(creds.model_name)
+file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path)
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "true"), os.path.join(file_manager.local_path_validation_data, "true"))
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "false"), os.path.join(file_manager.local_path_validation_data, "false"))
 

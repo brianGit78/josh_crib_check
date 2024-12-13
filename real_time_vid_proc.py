@@ -2,9 +2,11 @@ import cv2, time, datetime
 import numpy as np
 from tensorflow.keras.models import load_model
 from toggle_josh_crib import JoshAlert
+from file_sync import FileManager
 import creds
 
-model = load_model('/home/brian/josh_crib_check/crib_model.keras')
+file_manager = FileManager(creds.model_name)
+model = load_model(file_manager.model_file_path)
 josh_alert = JoshAlert()
 
 def preprocess_frame(frame):
