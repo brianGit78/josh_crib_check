@@ -30,6 +30,7 @@ def main():
     threshold = 0.5
     check_interval = 3
     last_check_time = time.time()
+    not_in_crib_count = 0
 
     while True:
         try:
@@ -49,11 +50,14 @@ def main():
                 prediction = model.predict(processed_frame, verbose=0)[0][0]
 
                 if prediction > threshold:
+                    not_in_crib_count = 0
                     josh_alert.turn_on_helper()
                     print(f"{datetime.datetime.now()} - Josh is IN the crib - Prediction: {prediction:.4f}")
                 else:
-                    josh_alert.turn_off_helper()
-                    print(f"{datetime.datetime.now()} - Josh is NOT in the crib - Prediction: {prediction:.4f}")
+                    not_in_crib_count += 1
+                    if not_in_crib_count >= 3:
+                        josh_alert.turn_off_helper()
+                        print(f"{datetime.datetime.now()} - Josh is NOT in the crib - Prediction: {prediction:.4f}")
 
         except Exception as e:
             print(f"{datetime.datetime.now()} - An error occurred: {e}")

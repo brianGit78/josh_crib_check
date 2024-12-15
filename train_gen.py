@@ -8,6 +8,7 @@ import creds
 
 #file operations
 file_manager = FileManager(creds.model_name)
+file_manager.create_local_directories()
 file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path)
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "true"), os.path.join(file_manager.local_path_validation_data, "true"))
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "false"), os.path.join(file_manager.local_path_validation_data, "false"))

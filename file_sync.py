@@ -6,7 +6,6 @@ class FileManager:
         self.local_path_training_data = os.path.join(self.local_path, "training_data")
         self.local_path_validation_data = os.path.join(self.local_path, "validation_data")
         self.model_file_path = os.path.join(self.local_path, model_name)
-        self.create_local_directories()
         
     def create_local_directories(self):
         if not os.path.exists(self.local_path_training_data):
