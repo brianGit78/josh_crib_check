@@ -14,7 +14,7 @@ file_manager.split_data_for_validation(os.path.join(file_manager.local_path_trai
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "false"), os.path.join(file_manager.local_path_validation_data, "false"))
 
 # Optional: Disable GPU if desired
-os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
+#os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 def create_model(input_shape=(256, 256, 1)):  # Changed to 1 channel
     return Sequential([

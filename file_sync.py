@@ -1,4 +1,4 @@
-import os, shutil, secrets, pexpect, datetime
+import os, shutil, secrets, pexpect, datetime, subprocess
 
 class FileManager:
     def __init__(self, model_name):
@@ -30,15 +30,27 @@ class FileManager:
             print(f"Model File not found: {self.model_file_path}")
 
     def sync_source(self, remote_user, remote_password, remote_host, remote_path):
-        rsync_cmd = f"rsync -avz --delete  --exclude 'thumbs.db' --exclude 'Thumbs.db' {remote_user}@{remote_host}:{remote_path}/ {self.local_path_training_data}/"
-        try:
-            child = pexpect.spawn(rsync_cmd)
-            child.expect('password:')
-            child.sendline(remote_password)
-            child.interact()
-            print("Directory successfully synchronized.")
-        except pexpect.exceptions.ExceptionPexpect as e:
-            print("An error occurred while synchronizing directories:", e)
+        #if not windows, use rsync
+        if os.name != 'nt':
+            rsync_cmd = f"rsync -avz --delete  --exclude 'thumbs.db' --exclude 'Thumbs.db' {remote_user}@{remote_host}:{remote_path}/ {self.local_path_training_data}/"
+            try:
+                child = pexpect.spawn(rsync_cmd)
+                child.expect('password:')
+                child.sendline(remote_password)
+                child.interact()
+                print("Directory successfully synchronized.")
+            except pexpect.exceptions.ExceptionPexpect as e:
+                print("An error occurred while synchronizing directories:", e)
+        else:
+            unc_path = f"\\\\{remote_host}\\{remote_path}"
+            robocopy_cmd = f"robocopy {unc_path} {self.local_path_training_data} /MIR /XD thumbs.db /XD Thumbs.db"
+            try:
+                #normal robocopy command
+                subprocess.run(robocopy_cmd, shell=True, check=True)
+                print("Directory successfully synchronized.")
+            except subprocess.CalledProcessError as e:
+                print("An error occurred while synchronizing directories:", e)
+            
 
     def split_data_for_validation(self, source_dir, val_dir, val_ratio=0.2):
         """
