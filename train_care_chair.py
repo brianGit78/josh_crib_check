@@ -4,7 +4,7 @@ from tensorflow.keras.preprocessing.image import ImageDataGenerator
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Input
 from tensorflow.keras.callbacks import EarlyStopping
 from file_sync import FileManager
-import creds
+import creds_care_chair as creds
 
 #file operations
 file_manager = FileManager(creds.model_name)

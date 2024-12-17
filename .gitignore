@@ -1,6 +1,9 @@
 __pycache__
 .vscode
 training_data
+model_archive
 validation_data
+josh_crib
+care_chair
 creds.py
 *.keras

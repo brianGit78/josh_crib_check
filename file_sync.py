@@ -1,11 +1,12 @@
-import os, shutil, secrets, pexpect
+import os, shutil, secrets, pexpect, datetime
 
 class FileManager:
     def __init__(self, model_name):
         self.local_path = os.getcwd()
-        self.local_path_training_data = os.path.join(self.local_path, "training_data")
-        self.local_path_validation_data = os.path.join(self.local_path, "validation_data")
-        self.model_file_path = os.path.join(self.local_path, model_name)
+        self.local_path_training_data = os.path.join(self.local_path, model_name, "training_data")
+        self.local_path_validation_data = os.path.join(self.local_path, model_name, "validation_data")
+        self.model_file_name = model_name + ".keras"
+        self.model_file_path = os.path.join(self.local_path, self.model_file_name)
         
     def create_local_directories(self):
         if not os.path.exists(self.local_path_training_data):
@@ -14,10 +15,17 @@ class FileManager:
         if not os.path.exists(self.local_path_validation_data):
             os.makedirs(self.local_path_validation_data)
 
-    def remove_model_file(self):
+    def archive_model_file(self):
         if os.path.exists(self.model_file_path):
-            os.remove(self.model_file_path)
-            print(f"Removed: {self.model_file_path}")
+            archive_folder = 'model_archive'
+            if not os.path.exists(archive_folder):
+                os.makedirs(archive_folder)
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            filename = os.path.basename(self.model_file_path)
+            archived_filename = f"{timestamp}_{filename}"
+            archive_path = os.path.join(archive_folder, archived_filename)
+            shutil.move(self.model_file_path, archive_path)
+            print(f"Moved: {self.model_file_path} to {archive_path}")
         else:
             print(f"Model File not found: {self.model_file_path}")
 
