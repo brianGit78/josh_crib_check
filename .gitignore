@@ -6,4 +6,5 @@ validation_data
 josh_crib
 care_chair
 creds.py
+creds_care_chair.py
 *.keras
