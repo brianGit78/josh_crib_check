@@ -1,0 +1,9 @@
+nas_host = '192.168.0.15'
+nas_user = 'brian'
+nas_password = 'Server1234#'
+nas_path = '/share/training_data/care_chair'
+model_name = 'care_chair'
+rtsp_url = 'rtsp://192.168.2.10:80/joshroom'
+home_assistant_url = "http://192.168.5.18:8123/api/"
+ha_access_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiNTg4MWI3MzY3MTc0NDg1YmViYzc0MGRiNGM0NTJkNyIsImlhdCI6MTczMDQwOTM5MiwiZXhwIjoyMDQ1NzY5MzkyfQ._jJstNTXfhQBBG6ZbsbVyi0XVhLHRlwMx_RoezazGKU"
+ha_entity_id = "input_boolean.care_chair_occupied"
