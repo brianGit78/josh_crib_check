@@ -1,4 +1,5 @@
-import os, shutil, secrets, pexpect, datetime, subprocess
+import os, shutil, secrets, pexpect, subprocess
+from datetime import datetime
 
 class FileManager:
     def __init__(self, model_name):
