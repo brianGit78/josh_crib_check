@@ -16,6 +16,7 @@ I train the model on my main windows box and run the service on my ubuntu applia
 ## Running as a service on Linux
 ```bash
 cat /etc/systemd/system/baby_crib_video_proc.service
+
 [Unit]
 Description=Real Time Video Processing Service
 After=network.target
