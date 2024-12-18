@@ -11,6 +11,8 @@ I used approximately 9000 images from sleep patterns over a 1 month time period.
 
 Images were converted to greyscale during training to prevent the model from focusing on light changes with the cameras night vision.
 
+I train the model on my main windows box and run the service on my ubuntu appliance. The train_gen.py and supporting FileManager class supports both Windows and Linux file paths.
+
 ## Creds.py file
 ```bash
 nas_host = "host_name_or_ip"
