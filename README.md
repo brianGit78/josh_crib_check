@@ -1,6 +1,6 @@
 # Real-time Image classification using an RTSP stream
 
-I developed this Tensorflow Keras project to solve a simple use case: notifying Home Assistant (HA) if my son is in or out of his crib. From there I have HA switch off the night light and change the audio from lullaby to white noise for the duration of his nap.
+I developed this Tensorflow Keras project to solve a simple use case: notifying Home Assistant (HA) if my son is in or out of his crib. From there I have HA switch off the night light and change the audio from lullaby to white noise for the duration of his nap. I tried to keep it as simple as possible so I could get an understanding of how to use image classification.
 
 I capture the RTSP stream of a Nanit camera (great hardware, but no publicly accessible API) using Scrypted to authenticate and expose the stream on my local network. I then have BlueIris take a snapshot every 5 minutes to build a library of training data. I then manually sorted the images into true or false folders. The Scrypted RTSP stream is then consumed by OpenCV as you will see in the video processing library.
 
@@ -44,6 +44,17 @@ rtsp_url = "rtsp://1.2.3.4:567/a354jad"
 home_assistant_url = "http://1.2.3.4:8123/api/"
 ha_access_token = "ha long lived token"
 ha_entity_id = "input_boolean.baby_in_crib"
+```
+
+## File System
+During training, this is set to pull from a NAS, which isn't entirely necessary, its just how I have it setup in my home (BlueIris dumps snapshots to my NAS, then I rsync or robocopy to my trianing machine). You can comment out the file_manager.sync_source line and have your training data already present in the project folder. 
+The file structure should look like this:
+```
+<root of project>/
+  <model_name in creds>/
+  └── training_data/
+      ├── true/
+      └── false/
 ```
 
 ## Image Samples
