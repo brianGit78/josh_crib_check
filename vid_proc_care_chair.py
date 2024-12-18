@@ -7,7 +7,7 @@ import creds_care_chair as creds
 
 file_manager = FileManager(creds.model_name)
 model = load_model(file_manager.model_file_path)
-josh_alert = JoshAlert()
+josh_alert = JoshAlert(creds.home_assistant_url, creds.ha_access_token, creds.ha_entity_id)
 
 def preprocess_frame(frame):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)

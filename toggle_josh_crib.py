@@ -1,12 +1,12 @@
 import requests
-import creds
+#import creds
 
 class JoshAlert:
-    def __init__(self):
+    def __init__(self, home_assistant_url, ha_access_token, ha_entity_id):
         # Configuration Variables
-        self.home_assistant_url = creds.home_assistant_url
-        self.access_token = creds.ha_access_token
-        self.entity_id = creds.ha_entity_id
+        self.home_assistant_url = home_assistant_url
+        self.access_token = ha_access_token
+        self.entity_id = ha_entity_id
 
     def get_entity_state(self):
         url = f"{self.home_assistant_url}states/{self.entity_id}"
