@@ -13,6 +13,25 @@ Images were converted to greyscale during training to prevent the model from foc
 
 I train the model on my main windows box and run the service on my ubuntu appliance. The train_gen.py and supporting FileManager class supports both Windows and Linux file paths.
 
+## Running as a service on Linux
+```bash
+cat /etc/systemd/system/baby_crib_video_proc.service
+[Unit]
+Description=Real Time Video Processing Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/user/josh_crib_check/
+ExecStart=/usr/bin/python3.10 /home/user/josh_crib_check/real_time_vid_proc.py
+Restart=always
+User=user
+Group=user
+
+[Install]
+WantedBy=multi-user.target
+
+```
 ## Creds.py file
 ```bash
 nas_host = "host_name_or_ip"
