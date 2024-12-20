@@ -1,47 +1,51 @@
 import os
 from tensorflow.keras.models import Sequential
-from tensorflow.keras.preprocessing.image import ImageDataGenerator
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Input, Dropout
+from tensorflow.keras.preprocessing.image import ImageDataGenerator, load_img, img_to_array
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Input, Dropout, BatchNormalization
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+import numpy as np
 from file_sync import FileManager
 import creds
 
 #file operations
 file_manager = FileManager(creds.model_name)
 file_manager.create_local_directories()
-file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path)
+file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path) #remove this if you already copied your files to this directly in the specified structure
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "true"), os.path.join(file_manager.local_path_validation_data, "true"))
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "false"), os.path.join(file_manager.local_path_validation_data, "false"))
-
-# Optional: Disable GPU if desired
-#os.environ['CUDA_VISIBLE_DEVICES'] = '-1'
 
 def create_model(input_shape=(256, 256, 1)):
     return Sequential([
         Input(shape=input_shape),
         Conv2D(32, (3, 3), activation='relu'),
         MaxPooling2D(),
-        Dropout(0.25),
         Conv2D(64, (3, 3), activation='relu'),
         MaxPooling2D(),
-        Dropout(0.25),
         Conv2D(128, (3, 3), activation='relu'),
         MaxPooling2D(),
         Flatten(),
         Dense(128, activation='relu'),
-        Dropout(0.5),
         Dense(1, activation='sigmoid')
     ])
 
-# Subtle data augmentation and rescaling
+# Load and preprocess the mask
+mask = load_img('crib_mask.png', color_mode='grayscale', target_size=(256, 256))
+mask = img_to_array(mask) / 255.0  # Convert to [0, 1] range
+
+def preprocess_input(img):
+    img = img / 255.0
+    img = img * mask
+    return img
+
 train_datagen = ImageDataGenerator(
-    rescale=1./255,
-    rotation_range=20,
-    width_shift_range=0.2,
-    height_shift_range=0.2,
-    shear_range=0.15,
-    zoom_range=0.15,
+    preprocessing_function=preprocess_input,
+    rotation_range=2,
+    width_shift_range=0.05,
+    height_shift_range=0.05,
+    shear_range=0.05,
+    zoom_range=0.1,
     horizontal_flip=True,
+    brightness_range=[0.9, 1.1],  # much closer to normal lighting
     fill_mode='nearest'
 )
 
@@ -72,7 +76,7 @@ model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']
 
 #early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 callbacks = [
-    EarlyStopping(patience=5, restore_best_weights=True),
+    EarlyStopping(patience=5, restore_best_weights=True),  #monitor='val_loss'
     ModelCheckpoint('best_model.keras', save_best_only=True)]
 
 model.fit(

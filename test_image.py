@@ -1,9 +1,11 @@
 import numpy as np
-import cv2
+import cv2, os
 from tensorflow.keras.models import load_model
+from file_sync import FileManager
+import creds
 
-# Load the trained model
-model = load_model('/home/brian/josh_crib_check/crib_model.keras')
+file_manager = FileManager(creds.model_name)
+model = load_model(file_manager.model_file_path)
 
 def preprocess_image(image_path):
     # Load the image using OpenCV
@@ -12,17 +14,15 @@ def preprocess_image(image_path):
         raise ValueError(f"Could not load image at {image_path}")
 
     # Resize to match training size
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     img = cv2.resize(img, (256, 256))
-    
-    # Convert to float and normalize (0-1)
-    img = img.astype('float32') / 255.0
-    
-    # Expand dimensions to form a batch of one image
-    img = np.expand_dims(img, axis=0)
+    img = img.astype('float32') / 255.0 # Convert to float and normalize (0-1)
+    img = np.expand_dims(img, axis=0) # Expand dimensions to form a batch of one image
     return img
 
 # Path to the test image
-test_image_path = 'validation_data/true/JoshNanit.20241111_013000303.jpg'
+test_image_path = os.path.join(file_manager.local_path_validation_data, "false", "JoshNanit.20241212_185800293.jpg")
+#test_image_path = 'validation_data/true/JoshNanit.20241111_013000303.jpg'
 
 # Preprocess the test image
 test_img = preprocess_image(test_image_path)
