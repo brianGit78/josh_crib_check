@@ -32,7 +32,8 @@ def main():
     last_check_time = time.time()
     in_crib_count = 0
     not_in_crib_count = 0
-    helper_on = False
+
+    current_state = josh_alert.get_entity_state()
 
     while True:
         try:
@@ -54,16 +55,28 @@ def main():
                 if prediction > threshold:
                     in_crib_count += 1
                     not_in_crib_count = 0
-                    if in_crib_count >= 3:
+
+                    # 3. Turn ON if we've hit the threshold and the current state is not already "on"
+                    if in_crib_count >= 3 and current_state != "on":
                         josh_alert.turn_on_helper()
+                        current_state = "on"
                         print(f"{datetime.datetime.now()} - Josh is IN the crib - Prediction: {prediction:.4f}")
+
                 else:
                     not_in_crib_count += 1
                     in_crib_count = 0
-                    if not_in_crib_count >= 3:
+
+                    # 4. Turn OFF if we've hit the threshold and the current state is not already "off"
+                    if not_in_crib_count >= 3 and current_state != "off":
                         josh_alert.turn_off_helper()
+                        current_state = "off"
                         print(f"{datetime.datetime.now()} - Josh is NOT in the crib - Prediction: {prediction:.4f}")
 
+
+        except KeyboardInterrupt:
+            # Handle graceful exit if needed
+            break
+        
         except Exception as e:
             print(f"{datetime.datetime.now()} - An error occurred: {e}")
             print("Retrying in 5 seconds...")
