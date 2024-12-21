@@ -76,7 +76,7 @@ model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']
 
 #early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
 callbacks = [
-    EarlyStopping(patience=5, restore_best_weights=True),  #monitor='val_loss'
+    EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),  #monitor='val_loss'
     ModelCheckpoint('best_model.keras', save_best_only=True)]
 
 model.fit(
