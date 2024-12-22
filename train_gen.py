@@ -1,4 +1,4 @@
-import os
+import os, logging
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, load_img, img_to_array
 from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Input, Dropout, BatchNormalization
@@ -7,15 +7,29 @@ import numpy as np
 from file_sync import FileManager
 import creds
 
+# Configure logging
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
+logging.basicConfig(
+    filename='logs/train_gen.log',
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+   )
+
 #file operations
+logging.info('Initializing FileManager')
 file_manager = FileManager(creds.model_name)
 file_manager.create_local_directories()
+logging.info('Syncing source files')
 file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path) #remove this if you already copied your files to this directly in the specified structure
+logging.info('Splitting data for validation')
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "true"), os.path.join(file_manager.local_path_validation_data, "true"))
 file_manager.split_data_for_validation(os.path.join(file_manager.local_path_training_data, "false"), os.path.join(file_manager.local_path_validation_data, "false"))
 
 def create_model(input_shape=(256, 256, 1)):
-    return Sequential([
+    logging.info('Creating model with input shape %s', input_shape)
+    model = Sequential([
         Input(shape=input_shape), # Input layer
         Conv2D(32, (3, 3), activation='relu'), # Convolutional layer
         MaxPooling2D(),     # Pooling layer
@@ -27,14 +41,20 @@ def create_model(input_shape=(256, 256, 1)):
         Dense(128, activation='relu'), # Dense layer
         Dense(1, activation='sigmoid') # Output layer
     ])
+    logging.info('Model created successfully')
+    return model
 
 # Load and preprocess the mask
+logging.info('Loading and preprocessing mask')
 mask = load_img('crib_mask.png', color_mode='grayscale', target_size=(256, 256)) # Load the mask
 mask = img_to_array(mask) / 255.0  # Convert to numpy array and normalize
+logging.info('Mask loaded and preprocessed successfully')
 
 def preprocess_input(img):
+    logging.info('Preprocessing input image')
     img = img / 255.0 # Normalize the image
     img = img * mask # Apply the mask
+    logging.info('Input image preprocessed successfully')
     return img
 
 train_datagen = ImageDataGenerator(

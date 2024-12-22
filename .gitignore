@@ -8,3 +8,4 @@ care_chair
 creds.py
 creds_care_chair.py
 *.keras
+logs
