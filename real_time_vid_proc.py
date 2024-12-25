@@ -32,6 +32,7 @@ model = load_model(file_manager.model_file_path)
 def preprocess_frame(frame):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     frame = cv2.resize(frame, (256, 256))
+    frame = cv2.equalizeHist(frame)  # Apply histogram equalization
     frame = frame.astype("float32") / 255.0
     frame = np.expand_dims(frame, axis=-1)  # (256,256,1)
     frame = np.expand_dims(frame, axis=0)   # (1,256,256,1)

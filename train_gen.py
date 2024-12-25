@@ -1,8 +1,8 @@
 import os, logging
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.preprocessing.image import ImageDataGenerator, load_img, img_to_array
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Input, Dropout, BatchNormalization
-from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
+from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Input
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, Callback
 import numpy as np
 from file_sync import FileManager
 import creds
@@ -15,7 +15,15 @@ logging.basicConfig(
     filename='logs/train_gen.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
-   )
+)
+
+# Create a StreamHandler to log to the screen
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+
+# Add the StreamHandler to the logger
+logging.getLogger().addHandler(console_handler)
 
 #file operations
 logging.info('Initializing FileManager')
@@ -51,10 +59,10 @@ mask = img_to_array(mask) / 255.0  # Convert to numpy array and normalize
 logging.info('Mask loaded and preprocessed successfully')
 
 def preprocess_input(img):
-    logging.info('Preprocessing input image')
+    #logging.info('Preprocessing input image')
     img = img / 255.0 # Normalize the image
     img = img * mask # Apply the mask
-    logging.info('Input image preprocessed successfully')
+    #logging.info('Input image preprocessed successfully')
     return img
 
 train_datagen = ImageDataGenerator(
@@ -94,7 +102,8 @@ model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy']
 
 callbacks = [
     EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True),  # Stop early if the validation loss stops improving
-    ModelCheckpoint('best_model.keras', save_best_only=True)] # Save the best model during training
+    ModelCheckpoint('best_model.keras', save_best_only=True) # Save the best model during training
+]
 
 model.fit(
     train_generator,
