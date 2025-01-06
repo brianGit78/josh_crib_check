@@ -49,7 +49,7 @@ ha_entity_id = "input_boolean.baby_in_crib"
 ```
 
 ## File System
-During training, this is set to pull from a NAS, which isn't entirely necessary, its just how I have it setup in my home (BlueIris dumps snapshots to my NAS, then I rsync or robocopy to my trianing machine). You can comment out the file_manager.sync_source line and have your training data already present in the project folder. 
+During training, this is set to pull from a NAS, which isn't entirely necessary, its just how I have it setup in my home (BlueIris dumps snapshots to my NAS, then I rsync or robocopy to my trianing machine). You can run the training script with --skip_sync_source if your training data is already in the project folder. You will also need to manually seperate out your validation data.
 The file structure should look like this:
 ```
 <root of project>/
