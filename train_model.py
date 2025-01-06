@@ -49,7 +49,6 @@ def create_file_manager():
     if not args.skip_source_sync:
         logging.info('Syncing source files')
         file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path)
-        # If you already have the data locally, comment out the sync above.
 
         logging.info('Splitting data for validation')
         file_manager.split_data_for_validation(
