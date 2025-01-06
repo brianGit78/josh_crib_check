@@ -1,10 +1,9 @@
 import os, cv2, time, datetime, asyncio, logging
 from logging.handlers import RotatingFileHandler
 import numpy as np
-import torch
+from tensorflow.keras.models import load_model
 from toggle_josh_crib import JoshAlertAsync
 from file_sync import FileManager
-from pt_cnn import SimpleCNN
 import creds
 
 # Configure logging
@@ -26,22 +25,18 @@ console_handler.setFormatter(formatter)
 logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
-# Initialize model
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = SimpleCNN().to(device)
-model.load_state_dict(torch.load('josh_crib.pth', map_location=device))
-model.eval()
+file_manager = FileManager(creds.model_name)
+model = load_model(file_manager.model_file_path)
+
 
 def preprocess_frame(frame):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     frame = cv2.resize(frame, (256, 256))
     frame = cv2.equalizeHist(frame)  # Apply histogram equalization
     frame = frame.astype("float32") / 255.0
-    #frame = np.expand_dims(frame, axis=-1)  # (256,256,1)
-    #frame = np.expand_dims(frame, axis=0)   # (1,256,256,1)
-    #return frame
-    frame = torch.from_numpy(frame).unsqueeze(0).unsqueeze(0)  # Add batch and channel dims (1,1,256,256)
-    return frame.to(device)
+    frame = np.expand_dims(frame, axis=-1)  # (256,256,1)
+    frame = np.expand_dims(frame, axis=0)   # (1,256,256,1)
+    return frame
 
 def connect_stream(url):
     cap = cv2.VideoCapture(url)
@@ -84,9 +79,7 @@ async def cv_proc():
                 last_check_time = current_time
 
                 processed_frame = preprocess_frame(frame)
-                #prediction = model.predict(processed_frame, verbose=0)[0][0]
-                with torch.no_grad():
-                    prediction = torch.sigmoid(model(processed_frame)).item()
+                prediction = model.predict(processed_frame, verbose=0)[0][0]
 
                 if prediction > threshold:
                     in_crib_count += 1
