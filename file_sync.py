@@ -6,7 +6,7 @@ class FileManager:
         self.local_path = os.getcwd()
         self.local_path_training_data = os.path.join(self.local_path, model_name, "training_data")
         self.local_path_validation_data = os.path.join(self.local_path, model_name, "validation_data")
-        self.model_file_name = model_name + ".keras"
+        self.model_file_name = model_name + ".pth"
         self.model_file_path = os.path.join(self.local_path, self.model_file_name)
         
     def create_local_directories(self):

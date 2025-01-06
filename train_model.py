@@ -1,5 +1,6 @@
 import argparse
 import os
+import time
 import logging
 import torch
 import torch.nn as nn
@@ -47,6 +48,7 @@ def create_file_manager():
     file_manager.create_local_directories()
 
     if not args.skip_source_sync:
+        file_sync_start_time = time.time()
         logging.info('Syncing source files')
         file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path)
 
@@ -59,6 +61,9 @@ def create_file_manager():
             os.path.join(file_manager.local_path_training_data, "false"),
             os.path.join(file_manager.local_path_validation_data, "false")
         )
+        
+        file_sync_end_time = time.time()
+        logging.info(f'Source sync and data split took {file_sync_end_time - file_sync_start_time:.2f} seconds')
 
     return file_manager
 
@@ -75,6 +80,7 @@ class ApplyMask:
         return img * self.mask_tensor
 
 def main():
+    model_train_start_time = time.time()
     configure_logging()
     file_manager = create_file_manager()
     
@@ -115,21 +121,29 @@ def main():
 
     model = SimpleCNN()
 
-    # 5) Training setup
+    logging.info(f"Training on {len(train_dataset)} samples")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model.to(device)
 
     criterion = nn.BCEWithLogitsLoss()
     optimizer = optim.Adam(model.parameters(), lr=1e-3)
 
-    # 6) Training loop with early stopping
+    logging.info("Starting training")
     num_epochs = 50
     best_val_loss = float('inf')
     patience = 5
     epochs_no_improve = 0
 
+    #Weights
+    # Suppose roughly 1 positive for every 4 negatives
+    #pos_weight_factor = 4.0
+
+    #criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pos_weight_factor]).to(device))
+    #optimizer = optim.Adam(model.parameters(), lr=1e-3)
+
     for epoch in range(num_epochs):
         # TRAIN
+        epoch_train_start_time = time.time()
         model.train()
         running_loss = 0.0
         for images, labels in train_loader:
@@ -140,6 +154,7 @@ def main():
             loss.backward()
             optimizer.step()
             running_loss += loss.item() * images.size(0)
+        
         epoch_train_loss = running_loss / len(train_loader.dataset)
 
         # VALIDATION
@@ -166,6 +181,9 @@ def main():
             f"Train Loss: {epoch_train_loss:.4f}, "
             f"Val Loss: {epoch_val_loss:.4f}, "
             f"Val Acc: {val_accuracy:.4f}")
+        
+        epoch_train_end_time = time.time()
+        logging.info(f'Epoch time taken: {epoch_train_end_time - epoch_train_start_time:.2f} seconds')
 
         if epoch_val_loss < best_val_loss:
             best_val_loss = epoch_val_loss
@@ -177,6 +195,8 @@ def main():
                 print("Early stopping triggered.")
                 break
 
+    model_train_end_time = time.time()
+    logging.info(f"Training complete - total time taken: {model_train_end_time - model_train_start_time:.2f} seconds")
     # LOAD BEST MODEL
     model.load_state_dict(torch.load(file_manager.model_file_path))
     model.eval()
