@@ -2,6 +2,7 @@ import os, cv2, time, datetime, asyncio, logging
 from logging.handlers import RotatingFileHandler
 import numpy as np
 import torch
+from PIL import Image
 from toggle_josh_crib import JoshAlertAsync
 from file_sync import FileManager
 from pt_cnn import SimpleCNN
@@ -27,10 +28,16 @@ logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
 # Initialize model
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 model = SimpleCNN().to(device)
 model.load_state_dict(torch.load('josh_crib.pth', map_location=device))
 model.eval()
+
+# Load mask once
+mask_pil = Image.open('crib_mask.png').convert('L').resize((256, 256))
+mask_array = np.array(mask_pil) / 255.0
+mask_tensor = torch.from_numpy(mask_array).unsqueeze(0).unsqueeze(0).float()  # (1,1,256,256)
+mask_tensor = mask_tensor.to(device)
 
 def preprocess_frame(frame):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -41,6 +48,8 @@ def preprocess_frame(frame):
     #frame = np.expand_dims(frame, axis=0)   # (1,256,256,1)
     #return frame
     frame = torch.from_numpy(frame).unsqueeze(0).unsqueeze(0)  # Add batch and channel dims (1,1,256,256)
+    # Apply the mask
+    frame = frame * mask_tensor
     return frame.to(device)
 
 def connect_stream(url):
