@@ -174,7 +174,7 @@ def main():
     train_transforms = T.Compose([
         T.Grayscale(num_output_channels=1),
         T.Resize((256, 256)),
-        #HistEqualization(),
+        HistEqualization(),
         T.RandomAffine(
             degrees=2,             # ±2 degrees
             translate=(0.05, 0.05),# ±5% shift
