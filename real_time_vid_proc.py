@@ -8,6 +8,7 @@ from file_sync import FileManager
 from pt_cnn import SimpleCNN
 import creds
 
+file_manager = FileManager(creds.model_name)
 # Configure logging
 if not os.path.exists('logs'):
     os.makedirs('logs')
@@ -30,7 +31,7 @@ logger.addHandler(console_handler)
 # Initialize model
 device = torch.device('cpu')
 model = SimpleCNN().to(device)
-model.load_state_dict(torch.load('josh_crib.pth', map_location=device))
+model.load_state_dict(torch.load(file_manager.model_file_path, map_location=device))
 model.eval()
 
 # Load mask once

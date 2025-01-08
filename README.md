@@ -13,7 +13,7 @@ I used approximately 30,000 images from sleep patterns over a 1 month time perio
 
 Images were converted to greyscale during training to prevent the model from focusing on light changes with the cameras night vision. Histogram is used in the OpenCV monitor to balance the light level across transitions.
 
-I train the model on my main windows box and run the service on my ubuntu appliance. The train_gen.py and supporting FileManager class supports both Windows and Linux file paths. On average, each Epoch takes about 400 seconds to train with sometimes 17 Epochs using an Nvidia RTX 4070 GPU.
+I train the model on my main windows box and run the service on my ubuntu appliance. The train_model.py and supporting FileManager class supports both Windows and Linux file paths. On average, each Epoch takes about 400 seconds to train with sometimes 17 Epochs using an Nvidia RTX 4070 GPU.
 
 ## Running as a service on Linux
 ```bash
