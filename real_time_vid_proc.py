@@ -29,7 +29,8 @@ logger.addHandler(file_handler)
 logger.addHandler(console_handler)
 
 # Initialize model
-device = torch.device('cpu')
+#device = torch.device('cpu')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model = SimpleCNN().to(device)
 model.load_state_dict(torch.load(file_manager.model_file_path, map_location=device))
 model.eval()
