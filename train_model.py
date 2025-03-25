@@ -64,6 +64,12 @@ def create_file_manager():
             os.path.join(file_manager.local_path_validation_data, "false")
         )
         
+        #copy from static validation library
+        #\\192.168.0.15\training_data\crib_validation\ true false
+
+        #os.path.join(file_manager.local_path_validation_data, "true")
+        #os.path.join(file_manager.local_path_validation_data, "false")
+
         file_sync_end_time = time.time()
         logging.info(f'Source sync and data split took {file_sync_end_time - file_sync_start_time:.2f} seconds')
 
