@@ -44,7 +44,7 @@ class FileManager:
                 print("An error occurred while synchronizing directories:", e)
         else:
             unc_path = f"\\\\{remote_host}\\{remote_path}"
-            robocopy_cmd = f"robocopy {unc_path} {self.local_path_training_data} /MIR /XD thumbs.db /XD Thumbs.db"
+            robocopy_cmd = f"robocopy {unc_path} {self.local_path_training_data} /MIR /XF thumbs.db /XF Thumbs.db"
             try:
                 #normal robocopy command
                 subprocess.run(robocopy_cmd, shell=True, check=True)
@@ -84,3 +84,25 @@ class FileManager:
             shutil.move(source_path, dest_path)
 
         print(f"Moved {val_count} files from {source_dir} to {val_dir} with high-entropy randomness.")
+
+    def copy_static_validation_data(self, remote_user, remote_password, remote_host, remote_path):
+        #if not windows, use rsync
+        if os.name != 'nt':
+            rsync_cmd = f"rsync -avz --delete  --exclude 'thumbs.db' --exclude 'Thumbs.db' {remote_user}@{remote_host}:{remote_path}/ {self.local_path_training_data}/"
+            try:
+                child = pexpect.spawn(rsync_cmd)
+                child.expect('password:')
+                child.sendline(remote_password)
+                child.interact()
+                print("Directory successfully synchronized.")
+            except pexpect.exceptions.ExceptionPexpect as e:
+                print("An error occurred while synchronizing directories:", e)
+        else:
+            unc_path = f"\\\\{remote_host}\\{remote_path}"
+            robocopy_cmd = f"robocopy {unc_path} {self.local_path_validation_data} /XF thumbs.db /XF Thumbs.db /S"
+            try:
+                #normal robocopy command
+                subprocess.run(robocopy_cmd, shell=True, check=True)
+                print("Directory successfully synchronized.")
+            except subprocess.CalledProcessError as e:
+                print("An error occurred while synchronizing directories:", e)

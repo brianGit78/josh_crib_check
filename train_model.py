@@ -54,7 +54,7 @@ def create_file_manager():
         logging.info('Syncing source files')
         file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path)
 
-        logging.info('Splitting data for validation')
+        logging.info('Splitting data ramdomly for validation')
         file_manager.split_data_for_validation(
             os.path.join(file_manager.local_path_training_data, "true"),
             os.path.join(file_manager.local_path_validation_data, "true")
@@ -63,12 +63,14 @@ def create_file_manager():
             os.path.join(file_manager.local_path_training_data, "false"),
             os.path.join(file_manager.local_path_validation_data, "false")
         )
-        
-        #copy from static validation library
-        #\\192.168.0.15\training_data\crib_validation\ true false
 
-        #os.path.join(file_manager.local_path_validation_data, "true")
-        #os.path.join(file_manager.local_path_validation_data, "false")
+        logging.info('Copying static validation images')
+        file_manager.copy_static_validation_data(
+            creds.nas_user, 
+            creds.nas_password, 
+            creds.nas_host, 
+            creds.static_validation_path
+        )
 
         file_sync_end_time = time.time()
         logging.info(f'Source sync and data split took {file_sync_end_time - file_sync_start_time:.2f} seconds')
