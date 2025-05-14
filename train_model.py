@@ -94,7 +94,16 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
     model.to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    optimizer = optim.Adam(model.parameters(), lr=1e-3)
+    # May 14, 2025 weight_decay=1e-5
+    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
+    
+    # learning rate scheduler (May 14, 2025)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode='min',
+        factor=0.5,  # Reduce LR by half when plateau is detected
+        patience=3,  # Wait 3 epochs before reducing
+    )
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -148,6 +157,12 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
               f"Train Loss: {epoch_train_loss:.4f} | "
               f"Val Loss: {epoch_val_loss:.4f} | "
               f"Val Acc: {epoch_val_acc:.4f}")
+        
+        # Add this line here to update learning rate based on validation loss
+        scheduler.step(epoch_val_loss)
+        # Manually log LR changes
+        current_lr = optimizer.param_groups[0]['lr']
+        logging.info("Current learning rate: %s", current_lr)
 
         # --- Early Stopping or Checkpointing ---
         if epoch_val_loss < best_val_loss:
@@ -177,7 +192,7 @@ class HistEqualization:
 def main():
     configure_logging()
     file_manager = create_file_manager()
-    
+
     # Define transforms for training and validation
     transforms_start_time = time.time()
     train_transforms = T.Compose([
@@ -229,7 +244,7 @@ def main():
 
     logging.info(f"Training on {len(train_dataset)} samples")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+
     #make sure we are using CUDA
     print(f"Using device: {device}")
     print(f"PyTorch version: {torch.__version__}")
@@ -238,7 +253,7 @@ def main():
         print(f"CUDA device count: {torch.cuda.device_count()}")
         print(f"Current device: {torch.cuda.current_device()}")
         print(f"Device name: {torch.cuda.get_device_name(0)}")
-    
+
     trained_model = train_model(model, train_loader, val_loader, device, num_epochs=50, patience=5)
     torch.save(trained_model.state_dict(), file_manager.model_file_path)
 
@@ -250,4 +265,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
