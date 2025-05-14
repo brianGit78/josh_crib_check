@@ -62,10 +62,12 @@ class FileManager:
         os.makedirs(val_dir, exist_ok=True)
 
         #delete all the files in the validation directory
-        for root, dirs, files in os.walk(val_dir):
-            for file in files:
-                os.remove(os.path.join(root, file))
-                print(f"Removed: {os.path.join(root, file)}")
+        ## removed because of the mirror option in robocopy
+        
+        #for root, dirs, files in os.walk(val_dir):
+        #    for file in files:
+        #        os.remove(os.path.join(root, file))
+        #        print(f"Removed: {os.path.join(root, file)}")
         
         # Get a list of all files in the source directory
         all_files = [f for f in os.listdir(source_dir) if os.path.isfile(os.path.join(source_dir, f))]
@@ -99,7 +101,7 @@ class FileManager:
                 print("An error occurred while synchronizing directories:", e)
         else:
             unc_path = f"\\\\{remote_host}\\{remote_path}"
-            robocopy_cmd = f"robocopy {unc_path} {self.local_path_validation_data} /XF thumbs.db /XF Thumbs.db /S"
+            robocopy_cmd = f"robocopy {unc_path} {self.local_path_validation_data} /MIR /XF thumbs.db /XF Thumbs.db"
             try:
                 #normal robocopy command
                 subprocess.run(robocopy_cmd, shell=True, check=True)

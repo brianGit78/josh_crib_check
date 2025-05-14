@@ -1,0 +1,16 @@
+# Core deep learning libraries
+torch
+torchvision
+
+# Image and video processing
+Pillow
+numpy
+opencv-python
+
+# HTTP client libraries
+requests
+httpx
+
+# Optional: if you need CUDA support
+# torch==2.3.0+cu121
+# torchvision==0.18.0+cu121

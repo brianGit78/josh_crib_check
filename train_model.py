@@ -54,6 +54,14 @@ def create_file_manager():
         logging.info('Syncing source files')
         file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path)
 
+        logging.info('Copying static validation images')
+        file_manager.copy_static_validation_data(
+            creds.nas_user,
+            creds.nas_password,
+            creds.nas_host,
+            creds.static_validation_path
+        )
+
         logging.info('Splitting data ramdomly for validation')
         file_manager.split_data_for_validation(
             os.path.join(file_manager.local_path_training_data, "true"),
@@ -64,13 +72,6 @@ def create_file_manager():
             os.path.join(file_manager.local_path_validation_data, "false")
         )
 
-        logging.info('Copying static validation images')
-        file_manager.copy_static_validation_data(
-            creds.nas_user, 
-            creds.nas_password, 
-            creds.nas_host, 
-            creds.static_validation_path
-        )
 
         file_sync_end_time = time.time()
         logging.info(f'Source sync and data split took {file_sync_end_time - file_sync_start_time:.2f} seconds')
@@ -228,6 +229,15 @@ def main():
 
     logging.info(f"Training on {len(train_dataset)} samples")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    #make sure we are using CUDA
+    print(f"Using device: {device}")
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"CUDA device count: {torch.cuda.device_count()}")
+        print(f"Current device: {torch.cuda.current_device()}")
+        print(f"Device name: {torch.cuda.get_device_name(0)}")
     
     trained_model = train_model(model, train_loader, val_loader, device, num_epochs=50, patience=5)
     torch.save(trained_model.state_dict(), file_manager.model_file_path)
