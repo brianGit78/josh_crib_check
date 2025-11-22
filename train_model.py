@@ -1,20 +1,19 @@
 import argparse
+import logging
 import os
 import time
-import logging
+
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import torchvision.transforms as T
-import torchvision.transforms.functional as TF
-from torchvision.transforms.functional import InterpolationMode
-from torchvision.datasets import ImageFolder
+from torch.cuda.amp import GradScaler, autocast
 from torch.utils.data import DataLoader
-from pt_cnn import SimpleCNN
-from PIL import Image
-import numpy as np
+from torchvision.datasets import ImageFolder
 
+from device_utils import describe_device, select_device
 from file_sync import FileManager
+from preprocessing import build_transforms
+from pt_cnn import CribMobileNet
 import creds
 
 parser = argparse.ArgumentParser(description="Training script")
@@ -78,32 +77,19 @@ def create_file_manager():
 
     return file_manager
 
-class ApplyMask:
-    def __init__(self, mask_path, target_size=(256, 256)):
-        # Load the mask once
-        mask_pil = Image.open(mask_path).convert('L').resize(target_size)
-        mask_array = np.array(mask_pil) / 255.0
-        self.mask_tensor = torch.from_numpy(mask_array).unsqueeze(0).float()  
-        # unsqueeze(0) -> shape becomes (1, H, W) for grayscale
-
-    def __call__(self, img):
-        # img is a tensor in [0,1], shape (1, H, W) for grayscale
-        return img * self.mask_tensor
-    
 def train_model(model, train_loader, val_loader, device, num_epochs=50, patience=5):
     model.to(device)
 
     criterion = nn.BCEWithLogitsLoss()
-    # May 14, 2025 weight_decay=1e-5
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
-    
-    # learning rate scheduler (May 14, 2025)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
         mode='min',
         factor=0.5,  # Reduce LR by half when plateau is detected
         patience=3,  # Wait 3 epochs before reducing
     )
+
+    scaler = GradScaler(enabled=device.type == 'cuda')
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -113,16 +99,18 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
         model.train()
         running_loss = 0.0
 
-        # --- TRAIN LOOP ---
         for images, labels in train_loader:
             images = images.to(device)
             labels = labels.float().to(device)
 
             optimizer.zero_grad()
-            logits = model(images)             # shape: (batch_size, 1)
-            loss = criterion(logits.squeeze(), labels)
-            loss.backward()
-            optimizer.step()
+            with autocast(enabled=scaler.is_enabled()):
+                logits = model(images)
+                loss = criterion(logits.squeeze(), labels)
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
 
             running_loss += loss.item() * images.size(0)
 
@@ -158,9 +146,7 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
               f"Val Loss: {epoch_val_loss:.4f} | "
               f"Val Acc: {epoch_val_acc:.4f}")
         
-        # Add this line here to update learning rate based on validation loss
         scheduler.step(epoch_val_loss)
-        # Manually log LR changes
         current_lr = optimizer.param_groups[0]['lr']
         logging.info("Current learning rate: %s", current_lr)
 
@@ -184,42 +170,13 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
     model.eval()
     return model
 
-class HistEqualization:
-    def __call__(self, img):
-        # Pillow-based histogram equalization
-        return TF.equalize(img)
-
 def main():
     configure_logging()
     file_manager = create_file_manager()
 
-    # Define transforms for training and validation
     transforms_start_time = time.time()
-    train_transforms = T.Compose([
-        T.Grayscale(num_output_channels=1),
-        T.Resize((256, 256)),
-        HistEqualization(),
-        T.RandomAffine(
-            degrees=2,             # ±2 degrees
-            translate=(0.05, 0.05),# ±5% shift
-            scale=(0.9, 1.1),      # ±10% zoom
-            shear=(-3, 3),         # ~±3 degrees shear (approx 0.05 rad)
-            interpolation=InterpolationMode.NEAREST,
-            fill=0                 # fill black for "empty" pixels
-        ),
-        T.RandomHorizontalFlip(p=0.5),
-        T.ColorJitter(brightness=(0.9, 1.1)),
-        T.ToTensor(),
-        ApplyMask('crib_mask.png')  # your custom mask transform
-    ])
-
-    # For validation, typically fewer or no augmentations
-    val_transforms = T.Compose([
-        T.Grayscale(num_output_channels=1),
-        T.Resize((256, 256)),
-        HistEqualization(),
-        T.ToTensor()
-    ])
+    train_transforms = build_transforms('crib_mask.png', train=True)
+    val_transforms = build_transforms('crib_mask.png', train=False)
 
     model_train_start_time = time.time()
     train_dataset = ImageFolder(
@@ -233,26 +190,47 @@ def main():
     )
 
     batch_size = 64
+    num_workers = min(8, (os.cpu_count() or 2))
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    device = select_device()
+    if device.type == 'cuda':
+        torch.cuda.set_device(device)
+        torch.backends.cudnn.benchmark = True
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.set_float32_matmul_precision('high')
+
+    pin_memory = device.type == 'cuda'
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=num_workers > 0,
+    )
+    val_loader = DataLoader(
+        val_dataset,
+        batch_size=batch_size,
+        shuffle=False,
+        num_workers=num_workers,
+        pin_memory=pin_memory,
+        persistent_workers=num_workers > 0,
+    )
     
     transforms_end_time = time.time()
     logging.info(f"Transforms defined - total time taken: {transforms_end_time - transforms_start_time:.2f} seconds")
 
-    model = SimpleCNN()
+    model = CribMobileNet(pretrained=True, dropout=0.35)
 
     logging.info(f"Training on {len(train_dataset)} samples")
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-    #make sure we are using CUDA
-    print(f"Using device: {device}")
+    print(f"Using device: {describe_device(device)}")
     print(f"PyTorch version: {torch.__version__}")
     print(f"CUDA available: {torch.cuda.is_available()}")
-    if torch.cuda.is_available():
+    if device.type == 'cuda':
         print(f"CUDA device count: {torch.cuda.device_count()}")
-        print(f"Current device: {torch.cuda.current_device()}")
-        print(f"Device name: {torch.cuda.get_device_name(0)}")
+        print(f"Current device index: {torch.cuda.current_device()}")
+        print(f"Device name: {torch.cuda.get_device_name(torch.cuda.current_device())}")
 
     trained_model = train_model(model, train_loader, val_loader, device, num_epochs=50, patience=5)
     torch.save(trained_model.state_dict(), file_manager.model_file_path)
