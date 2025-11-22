@@ -6,7 +6,7 @@ import time
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.cuda.amp import GradScaler, autocast
+from torch import amp
 from torch.utils.data import DataLoader
 from torchvision.datasets import ImageFolder
 
@@ -89,7 +89,8 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
         patience=3,  # Wait 3 epochs before reducing
     )
 
-    scaler = GradScaler(enabled=device.type == 'cuda')
+    use_autocast = device.type in {"cuda", "mps"}
+    scaler = amp.GradScaler(device_type="cuda", enabled=device.type == "cuda")
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
@@ -104,7 +105,11 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
             labels = labels.float().to(device)
 
             optimizer.zero_grad()
-            with autocast(enabled=scaler.is_enabled()):
+            with amp.autocast(
+                device_type=device.type if use_autocast else "cpu",
+                dtype=torch.float16 if device.type == "cuda" else None,
+                enabled=use_autocast,
+            ):
                 logits = model(images)
                 loss = criterion(logits.squeeze(), labels)
 

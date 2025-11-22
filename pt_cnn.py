@@ -17,7 +17,7 @@ class CribMobileNet(nn.Module):
         weights = MobileNet_V3_Small_Weights.IMAGENET1K_V1 if pretrained else None
         self.backbone = mobilenet_v3_small(weights=weights)
 
-        in_features = self.backbone.classifier[-1].in_features
+        in_features = self.backbone.classifier[0].in_features
         self.backbone.classifier = nn.Sequential(
             nn.Dropout(dropout),
             nn.Linear(in_features, 256),
