@@ -90,7 +90,7 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
     )
 
     use_autocast = device.type in {"cuda", "mps"}
-    scaler = amp.GradScaler(device_type="cuda", enabled=device.type == "cuda")
+    scaler = amp.GradScaler("cuda") if device.type == "cuda" else amp.GradScaler(enabled=False)
 
     best_val_loss = float('inf')
     epochs_no_improve = 0
