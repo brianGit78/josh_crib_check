@@ -1,4 +1,5 @@
 import argparse
+import json
 import logging
 import os
 import time
@@ -76,6 +77,70 @@ def create_file_manager():
         logging.info(f'Source sync and data split took {file_sync_end_time - file_sync_start_time:.2f} seconds')
 
     return file_manager
+
+
+def compute_validation_predictions(model, val_loader, device):
+    model.eval()
+    probabilities = []
+    labels_list = []
+    with torch.no_grad():
+        for images, labels in val_loader:
+            images = images.to(device)
+            logits = model(images)
+            probs = torch.sigmoid(logits.squeeze())
+            probabilities.append(probs.detach().cpu())
+            labels_list.append(labels.float().cpu())
+
+    return torch.cat(probabilities), torch.cat(labels_list)
+
+
+def find_best_threshold(probabilities, labels, beta=0.5):
+    thresholds = torch.linspace(0.2, 0.8, steps=25)
+    best = {"threshold": 0.5, "fscore": 0.0, "precision": 0.0, "recall": 0.0}
+
+    for threshold in thresholds:
+        preds = (probabilities >= threshold).float()
+
+        tp = ((preds == 1) & (labels == 1)).sum().item()
+        fp = ((preds == 1) & (labels == 0)).sum().item()
+        fn = ((preds == 0) & (labels == 1)).sum().item()
+
+        precision = tp / (tp + fp + 1e-8)
+        recall = tp / (tp + fn + 1e-8)
+        fscore = (1 + beta ** 2) * precision * recall / (beta ** 2 * precision + recall + 1e-8)
+
+        if fscore > best["fscore"]:
+            best.update(
+                {
+                    "threshold": threshold.item(),
+                    "fscore": fscore,
+                    "precision": precision,
+                    "recall": recall,
+                }
+            )
+
+    return best
+
+
+def save_thresholds(file_manager, base_threshold, best_metrics, margin=0.05):
+    threshold_on = min(0.99, base_threshold + margin)
+    threshold_off = max(0.01, base_threshold - margin)
+    payload = {
+        "base_threshold": base_threshold,
+        "threshold_on": threshold_on,
+        "threshold_off": threshold_off,
+        "calibration": best_metrics,
+    }
+
+    with open(file_manager.thresholds_file_path, "w", encoding="utf-8") as f:
+        json.dump(payload, f, indent=2)
+
+    logging.info(
+        "Saved calibrated thresholds to %s (on=%.3f, off=%.3f)",
+        file_manager.thresholds_file_path,
+        threshold_on,
+        threshold_off,
+    )
 
 def train_model(model, train_loader, val_loader, device, num_epochs=50, patience=5):
     model.to(device)
@@ -175,6 +240,19 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
     model.eval()
     return model
 
+
+def calibrate_thresholds(model, val_loader, device, file_manager):
+    probabilities, labels = compute_validation_predictions(model, val_loader, device)
+    best_metrics = find_best_threshold(probabilities, labels)
+    save_thresholds(file_manager, best_metrics["threshold"], best_metrics)
+    logging.info(
+        "Calibration summary - threshold: %.3f | f_beta: %.4f | precision: %.4f | recall: %.4f",
+        best_metrics["threshold"],
+        best_metrics["fscore"],
+        best_metrics["precision"],
+        best_metrics["recall"],
+    )
+
 def main():
     configure_logging()
     file_manager = create_file_manager()
@@ -238,6 +316,7 @@ def main():
         print(f"Device name: {torch.cuda.get_device_name(torch.cuda.current_device())}")
 
     trained_model = train_model(model, train_loader, val_loader, device, num_epochs=50, patience=5)
+    calibrate_thresholds(trained_model, val_loader, device, file_manager)
     torch.save(trained_model.state_dict(), file_manager.model_file_path)
 
     model_train_end_time = time.time()

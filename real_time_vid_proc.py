@@ -1,4 +1,4 @@
-import os, cv2, time, datetime, asyncio, logging
+import os, cv2, time, datetime, asyncio, logging, json
 from collections import deque
 from logging.handlers import RotatingFileHandler
 
@@ -47,6 +47,26 @@ model.eval()
 preprocess = build_transforms('crib_mask.png', train=False)
 
 
+def load_thresholds(default_on=0.55, default_off=0.45):
+    threshold_on, threshold_off = default_on, default_off
+    if os.path.exists(file_manager.thresholds_file_path):
+        try:
+            with open(file_manager.thresholds_file_path, "r", encoding="utf-8") as f:
+                payload = json.load(f)
+                threshold_on = float(payload.get("threshold_on", threshold_on))
+                threshold_off = float(payload.get("threshold_off", threshold_off))
+                logging.info(
+                    "Loaded calibrated thresholds: on=%.3f off=%.3f (base=%.3f)",
+                    threshold_on,
+                    threshold_off,
+                    payload.get("base_threshold"),
+                )
+        except Exception as exc:
+            logging.warning("Failed to load calibrated thresholds, using defaults: %s", exc)
+
+    return threshold_on, threshold_off
+
+
 def preprocess_frame(frame):
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     pil_image = Image.fromarray(rgb_frame)
@@ -75,8 +95,7 @@ async def cv_proc():
     # Connect to RTSP stream
     cap = connect_stream(creds.rtsp_url)
 
-    threshold_on = 0.55
-    threshold_off = 0.45
+    threshold_on, threshold_off = load_thresholds(default_on=0.6, default_off=0.4)
     check_interval = 3
     last_check_time = time.time()
     in_crib_count = 0
