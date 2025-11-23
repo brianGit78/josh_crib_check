@@ -70,6 +70,7 @@ def deduplicate_imagefolder(dataset: ImageFolder, split_name: str) -> None:
     if not dataset.samples:
         return
 
+    dedup_start = time.time()
     unique_samples = []
     hash_to_label = {}
     conflicts = 0
@@ -111,6 +112,12 @@ def deduplicate_imagefolder(dataset: ImageFolder, split_name: str) -> None:
     dataset.imgs = unique_samples
     dataset.targets = [label for _, label in unique_samples]
 
+    logging.info(
+        'Deduplication for %s completed in %.2f seconds',
+        split_name,
+        time.time() - dedup_start,
+    )
+
 
 def build_balanced_sampler(dataset: ImageFolder):
     """Create a class-balanced sampler to reduce bias from uneven or duplicate-heavy folders."""
@@ -136,6 +143,7 @@ def compute_pos_weight(dataset: ImageFolder) -> torch.Tensor | None:
     if not dataset.targets:
         return None
 
+    weight_start = time.time()
     counts = Counter(dataset.targets)
     pos = counts.get(1, 0)
     neg = counts.get(0, 0)
@@ -154,6 +162,11 @@ def compute_pos_weight(dataset: ImageFolder) -> torch.Tensor | None:
         pos_weight.item(),
         pos,
         neg,
+    )
+    logging.info(
+        'pos_weight computation for %s samples completed in %.2f seconds',
+        len(dataset.targets),
+        time.time() - weight_start,
     )
     return pos_weight
 
@@ -174,6 +187,7 @@ def create_file_manager():
     Initialize and return a FileManager. Also handles file synchronization
     and dataset splitting.
     """
+    creation_start = time.time()
     logging.info('Initializing FileManager')
     file_manager = FileManager(creds.model_name)
     file_manager.create_local_directories()
@@ -204,6 +218,8 @@ def create_file_manager():
 
         file_sync_end_time = time.time()
         logging.info(f'Source sync and data split took {file_sync_end_time - file_sync_start_time:.2f} seconds')
+
+    logging.info('FileManager setup completed in %.2f seconds', time.time() - creation_start)
 
     return file_manager
 
@@ -312,6 +328,7 @@ def train_model(model, train_loader, val_loader, device, pos_weight=None, num_ep
         model.train()
         running_loss = 0.0
 
+        train_pass_start = time.time()
         for images, labels in train_loader:
             images = images.to(device)
             labels = labels.float().to(device)
@@ -335,6 +352,12 @@ def train_model(model, train_loader, val_loader, device, pos_weight=None, num_ep
             running_loss += loss.item() * images.size(0)
 
         epoch_train_loss = running_loss / len(train_loader.dataset)
+        logging.info(
+            "Epoch %d training pass complete - loss: %.4f - time taken: %.2f seconds",
+            epoch + 1,
+            epoch_train_loss,
+            time.time() - train_pass_start,
+        )
 
         # --- VALIDATION LOOP ---
         model.eval()
@@ -342,6 +365,7 @@ def train_model(model, train_loader, val_loader, device, pos_weight=None, num_ep
         correct = 0
         total = 0
 
+        validation_start = time.time()
         with torch.no_grad():
             for images, labels in val_loader:
                 images = images.to(device)
@@ -361,6 +385,13 @@ def train_model(model, train_loader, val_loader, device, pos_weight=None, num_ep
 
         epoch_val_loss = val_loss / len(val_loader.dataset)
         epoch_val_acc = correct / total
+        logging.info(
+            "Epoch %d validation pass complete - loss: %.4f - accuracy: %.4f - time taken: %.2f seconds",
+            epoch + 1,
+            epoch_val_loss,
+            epoch_val_acc,
+            time.time() - validation_start,
+        )
 
         # Print or log training/val metrics
         print(f"Epoch {epoch+1}/{num_epochs} | "
@@ -394,9 +425,20 @@ def train_model(model, train_loader, val_loader, device, pos_weight=None, num_ep
 
 
 def calibrate_thresholds(model, val_loader, device, file_manager):
+    calibration_start = time.time()
+    prob_start = time.time()
     probabilities, labels = compute_validation_predictions(model, val_loader, device)
+    logging.info(
+        "Collected validation probabilities for calibration in %.2f seconds", time.time() - prob_start
+    )
+    search_start = time.time()
     best_metrics = find_best_threshold(probabilities, labels)
+    logging.info(
+        "Threshold sweep completed in %.2f seconds", time.time() - search_start
+    )
+    save_start = time.time()
     save_thresholds(file_manager, best_metrics["threshold"], best_metrics)
+    logging.info("Threshold persistence completed in %.2f seconds", time.time() - save_start)
     logging.info(
         "Calibration summary - threshold: %.3f | f_beta: %.4f | precision: %.4f | recall: %.4f",
         best_metrics["threshold"],
@@ -407,6 +449,7 @@ def calibrate_thresholds(model, val_loader, device, file_manager):
     logging.info(
         "Precision-targeted calibration chooses the highest recall with >=0.995 precision; rerun calibration if lighting/context shifts."
     )
+    logging.info("End-to-end calibration completed in %.2f seconds", time.time() - calibration_start)
 
 def main():
     configure_logging()
@@ -415,8 +458,15 @@ def main():
     transforms_start_time = time.time()
     train_transforms = build_transforms('crib_mask.png', train=True)
     val_transforms = build_transforms('crib_mask.png', train=False)
+    transforms_end_time = time.time()
+    logging.info(
+        "Transforms defined - total time taken: %.2f seconds",
+        transforms_end_time - transforms_start_time,
+    )
 
     model_train_start_time = time.time()
+    train_dataset_build_start = time.time()
+    logging.info('Loading train ImageFolder from %s', file_manager.local_path_training_data)
     train_dataset = ImageFolder(
         root=file_manager.local_path_training_data,
         transform=train_transforms
@@ -424,13 +474,25 @@ def main():
     deduplicate_imagefolder(train_dataset, 'train')
     log_split_stats(train_dataset, 'train')
     pos_weight = compute_pos_weight(train_dataset)
+    logging.info(
+        'Train dataset prepared with %d samples in %.2f seconds',
+        len(train_dataset),
+        time.time() - train_dataset_build_start,
+    )
 
+    val_dataset_build_start = time.time()
+    logging.info('Loading val ImageFolder from %s', file_manager.local_path_validation_data)
     val_dataset = ImageFolder(
         root=file_manager.local_path_validation_data,
         transform=val_transforms
     )
     deduplicate_imagefolder(val_dataset, 'val')
     log_split_stats(val_dataset, 'val')
+    logging.info(
+        'Validation dataset prepared with %d samples in %.2f seconds',
+        len(val_dataset),
+        time.time() - val_dataset_build_start,
+    )
 
     batch_size = 64
     num_workers = min(8, (os.cpu_count() or 2))
@@ -444,6 +506,7 @@ def main():
 
     pin_memory = device.type == 'cuda'
 
+    loader_build_start = time.time()
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
@@ -460,9 +523,12 @@ def main():
         pin_memory=pin_memory,
         persistent_workers=num_workers > 0,
     )
-    
-    transforms_end_time = time.time()
-    logging.info(f"Transforms defined - total time taken: {transforms_end_time - transforms_start_time:.2f} seconds")
+    logging.info(
+        'DataLoaders prepared (train: %d batches, val: %d batches) in %.2f seconds',
+        len(train_loader),
+        len(val_loader),
+        time.time() - loader_build_start,
+    )
 
     model = CribMobileNet(pretrained=True, dropout=0.35)
 
