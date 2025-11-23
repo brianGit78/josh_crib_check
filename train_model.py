@@ -43,6 +43,9 @@ def configure_logging(log_dir='logs', log_filename='train_gen.log'):
 
 
 def _hash_file(path: str) -> str:
+    # Use a content hash (SHA-1) so duplicate images with different filenames
+    # collapse to the same key. Reading in 8 KB chunks keeps memory usage low
+    # even for large files.
     hasher = hashlib.sha1()
     with open(path, 'rb') as f:
         while True:
@@ -65,9 +68,12 @@ def deduplicate_imagefolder(dataset: ImageFolder, split_name: str) -> None:
 
     for path, label in dataset.samples:
         file_hash = _hash_file(path)
+        # First time we see a hash, remember its label and keep the sample.
         if file_hash not in hash_to_label:
             hash_to_label[file_hash] = label
             unique_samples.append((path, label))
+        # If the same file content shows up under a different label, surface it
+        # as a potential labeling mistake instead of silently choosing one.
         elif hash_to_label[file_hash] != label:
             conflicts += 1
             logging.warning('Duplicate content with conflicting labels detected in %s: %s', split_name, path)
