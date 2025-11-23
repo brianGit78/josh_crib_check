@@ -288,7 +288,10 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
                 enabled=use_autocast,
             ):
                 logits = model(images)
-                loss = criterion(logits.squeeze(), labels)
+                # Keep logits/labels aligned as 1D tensors even for batch size 1
+                logits_flat = logits.view(-1)
+                labels_flat = labels.view(-1)
+                loss = criterion(logits_flat, labels_flat)
 
             scaler.scale(loss).backward()
             scaler.step(optimizer)
@@ -310,14 +313,16 @@ def train_model(model, train_loader, val_loader, device, num_epochs=50, patience
                 labels = labels.float().to(device)
 
                 logits = model(images)
-                loss = criterion(logits.squeeze(), labels)
+                logits_flat = logits.view(-1)
+                labels_flat = labels.view(-1)
+                loss = criterion(logits_flat, labels_flat)
                 val_loss += loss.item() * images.size(0)
 
                 # If you want accuracy:
-                preds = torch.sigmoid(logits)              # convert logits -> probabilities
-                preds = (preds > 0.5).float()              # threshold at 0.5
-                correct += (preds.squeeze() == labels).sum().item()
-                total += labels.size(0)
+                preds = torch.sigmoid(logits_flat)        # convert logits -> probabilities
+                preds = (preds > 0.5).float()             # threshold at 0.5
+                correct += (preds == labels_flat).sum().item()
+                total += labels_flat.size(0)
 
         epoch_val_loss = val_loss / len(val_loader.dataset)
         epoch_val_acc = correct / total
