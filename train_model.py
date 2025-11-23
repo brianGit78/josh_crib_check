@@ -94,9 +94,12 @@ def compute_validation_predictions(model, val_loader, device):
     return torch.cat(probabilities), torch.cat(labels_list)
 
 
-def find_best_threshold(probabilities, labels, beta=0.5):
-    thresholds = torch.linspace(0.2, 0.8, steps=25)
+def find_best_threshold(probabilities, labels, beta=0.5, target_precision=0.995):
+    # Sweep a fine-grained set of thresholds toward the high-confidence side to
+    # prioritize precision and cut false positives.
+    thresholds = torch.linspace(0.01, 0.99, steps=99)
     best = {"threshold": 0.5, "fscore": 0.0, "precision": 0.0, "recall": 0.0}
+    best_high_precision = None
 
     for threshold in thresholds:
         preds = (probabilities >= threshold).float()
@@ -109,6 +112,15 @@ def find_best_threshold(probabilities, labels, beta=0.5):
         recall = tp / (tp + fn + 1e-8)
         fscore = (1 + beta ** 2) * precision * recall / (beta ** 2 * precision + recall + 1e-8)
 
+        if precision >= target_precision:
+            if best_high_precision is None or recall > best_high_precision["recall"]:
+                best_high_precision = {
+                    "threshold": threshold.item(),
+                    "fscore": fscore,
+                    "precision": precision,
+                    "recall": recall,
+                }
+
         if fscore > best["fscore"]:
             best.update(
                 {
@@ -119,12 +131,16 @@ def find_best_threshold(probabilities, labels, beta=0.5):
                 }
             )
 
-    return best
+    # Prefer the highest-recall option that satisfies the precision target.
+    return best_high_precision or best
 
 
 def save_thresholds(file_manager, base_threshold, best_metrics, margin=0.05):
-    threshold_on = min(0.99, base_threshold + margin)
-    threshold_off = max(0.01, base_threshold - margin)
+    # Shrink the hysteresis window as thresholds move toward 1.0 so "on" and
+    # "off" remain separated without letting borderline highs trigger.
+    adaptive_margin = margin * (1.0 - base_threshold + 0.2)
+    threshold_on = min(0.995, base_threshold + adaptive_margin)
+    threshold_off = max(0.01, base_threshold - adaptive_margin)
     payload = {
         "base_threshold": base_threshold,
         "threshold_on": threshold_on,
@@ -251,6 +267,9 @@ def calibrate_thresholds(model, val_loader, device, file_manager):
         best_metrics["fscore"],
         best_metrics["precision"],
         best_metrics["recall"],
+    )
+    logging.info(
+        "Precision-targeted calibration chooses the highest recall with >=0.995 precision; rerun calibration if lighting/context shifts."
     )
 
 def main():

@@ -47,7 +47,7 @@ model.eval()
 preprocess = build_transforms('crib_mask.png', train=False)
 
 
-def load_thresholds(default_on=0.55, default_off=0.45):
+def load_thresholds(default_on=0.8, default_off=0.6):
     threshold_on, threshold_off = default_on, default_off
     if os.path.exists(file_manager.thresholds_file_path):
         try:
@@ -95,7 +95,7 @@ async def cv_proc():
     # Connect to RTSP stream
     cap = connect_stream(creds.rtsp_url)
 
-    threshold_on, threshold_off = load_thresholds(default_on=0.6, default_off=0.4)
+    threshold_on, threshold_off = load_thresholds(default_on=0.8, default_off=0.6)
     check_interval = 3
     last_check_time = time.time()
     in_crib_count = 0
