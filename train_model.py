@@ -3,6 +3,8 @@ import json
 import logging
 import os
 import time
+import hashlib
+from collections import Counter
 
 import torch
 import torch.nn as nn
@@ -38,6 +40,76 @@ def configure_logging(log_dir='logs', log_filename='train_gen.log'):
     console_handler.setLevel(logging.INFO)
     console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
     logging.getLogger().addHandler(console_handler)
+
+
+def _hash_file(path: str) -> str:
+    hasher = hashlib.sha1()
+    with open(path, 'rb') as f:
+        while True:
+            chunk = f.read(8192)
+            if not chunk:
+                break
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
+def deduplicate_imagefolder(dataset: ImageFolder, split_name: str) -> None:
+    """Remove exact-duplicate images (by content hash) to avoid overweighting repeated snapshots."""
+
+    if not dataset.samples:
+        return
+
+    unique_samples = []
+    hash_to_label = {}
+    conflicts = 0
+
+    for path, label in dataset.samples:
+        file_hash = _hash_file(path)
+        if file_hash not in hash_to_label:
+            hash_to_label[file_hash] = label
+            unique_samples.append((path, label))
+        elif hash_to_label[file_hash] != label:
+            conflicts += 1
+            logging.warning('Duplicate content with conflicting labels detected in %s: %s', split_name, path)
+
+    removed = len(dataset.samples) - len(unique_samples)
+    if removed > 0:
+        logging.info(
+            'Deduplicated %s split: removed %d exact duplicates (kept %d unique samples)',
+            split_name,
+            removed,
+            len(unique_samples)
+        )
+    if conflicts:
+        logging.warning('Found %d duplicate files with conflicting labels in %s; please double-check labeling.', conflicts, split_name)
+
+    dataset.samples = unique_samples
+    dataset.imgs = unique_samples
+    dataset.targets = [label for _, label in unique_samples]
+
+
+def build_balanced_sampler(dataset: ImageFolder):
+    """Create a class-balanced sampler to reduce bias from uneven or duplicate-heavy folders."""
+
+    if not dataset.targets:
+        return None
+
+    class_counts = Counter(dataset.targets)
+    num_samples = len(dataset.targets)
+    class_weights = {cls: num_samples / (len(class_counts) * count) for cls, count in class_counts.items()}
+    sample_weights = [class_weights[label] for label in dataset.targets]
+    return torch.utils.data.WeightedRandomSampler(sample_weights, num_samples=num_samples, replacement=True)
+
+
+def log_split_stats(dataset: ImageFolder, split_name: str) -> None:
+    if not dataset.targets:
+        logging.warning('No samples found in %s split after deduplication', split_name)
+        return
+
+    counts = Counter(dataset.targets)
+    label_names = {idx: name for idx, name in enumerate(dataset.classes)}
+    readable_counts = {label_names[idx]: count for idx, count in counts.items()}
+    logging.info('%s split class distribution: %s', split_name, readable_counts)
 
 
 def create_file_manager():
@@ -285,11 +357,16 @@ def main():
         root=file_manager.local_path_training_data,
         transform=train_transforms
     )
+    deduplicate_imagefolder(train_dataset, 'train')
+    train_sampler = build_balanced_sampler(train_dataset)
+    log_split_stats(train_dataset, 'train')
 
     val_dataset = ImageFolder(
         root=file_manager.local_path_validation_data,
         transform=val_transforms
     )
+    deduplicate_imagefolder(val_dataset, 'val')
+    log_split_stats(val_dataset, 'val')
 
     batch_size = 64
     num_workers = min(8, (os.cpu_count() or 2))
@@ -306,7 +383,8 @@ def main():
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=True,
+        shuffle=train_sampler is None,
+        sampler=train_sampler,
         num_workers=num_workers,
         pin_memory=pin_memory,
         persistent_workers=num_workers > 0,
