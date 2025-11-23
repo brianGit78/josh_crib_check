@@ -125,6 +125,39 @@ def build_balanced_sampler(dataset: ImageFolder):
     return torch.utils.data.WeightedRandomSampler(sample_weights, num_samples=num_samples, replacement=True)
 
 
+def compute_pos_weight(dataset: ImageFolder) -> torch.Tensor | None:
+    """
+    Compute a positive-class weight for BCEWithLogitsLoss instead of resampling.
+
+    This uses the ratio of negative to positive examples so minority positives
+    receive higher loss. If either class is missing, no weighting is applied.
+    """
+
+    if not dataset.targets:
+        return None
+
+    counts = Counter(dataset.targets)
+    pos = counts.get(1, 0)
+    neg = counts.get(0, 0)
+
+    if pos == 0 or neg == 0:
+        logging.warning(
+            "Class weighting skipped because one class is empty (pos=%d, neg=%d)",
+            pos,
+            neg,
+        )
+        return None
+
+    pos_weight = torch.tensor([neg / pos], dtype=torch.float32)
+    logging.info(
+        "Using loss pos_weight=%.4f derived from class counts (pos=%d, neg=%d)",
+        pos_weight.item(),
+        pos,
+        neg,
+    )
+    return pos_weight
+
+
 def log_split_stats(dataset: ImageFolder, split_name: str) -> None:
     if not dataset.targets:
         logging.warning('No samples found in %s split after deduplication', split_name)
@@ -254,10 +287,12 @@ def save_thresholds(file_manager, base_threshold, best_metrics, margin=0.05):
         threshold_off,
     )
 
-def train_model(model, train_loader, val_loader, device, num_epochs=50, patience=5):
+def train_model(model, train_loader, val_loader, device, pos_weight=None, num_epochs=50, patience=5):
     model.to(device)
 
-    criterion = nn.BCEWithLogitsLoss()
+    if pos_weight is not None:
+        pos_weight = pos_weight.to(device)
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
         optimizer,
@@ -387,8 +422,8 @@ def main():
         transform=train_transforms
     )
     deduplicate_imagefolder(train_dataset, 'train')
-    train_sampler = build_balanced_sampler(train_dataset)
     log_split_stats(train_dataset, 'train')
+    pos_weight = compute_pos_weight(train_dataset)
 
     val_dataset = ImageFolder(
         root=file_manager.local_path_validation_data,
@@ -412,8 +447,7 @@ def main():
     train_loader = DataLoader(
         train_dataset,
         batch_size=batch_size,
-        shuffle=train_sampler is None,
-        sampler=train_sampler,
+        shuffle=True,
         num_workers=num_workers,
         pin_memory=pin_memory,
         persistent_workers=num_workers > 0,
@@ -441,7 +475,15 @@ def main():
         print(f"Current device index: {torch.cuda.current_device()}")
         print(f"Device name: {torch.cuda.get_device_name(torch.cuda.current_device())}")
 
-    trained_model = train_model(model, train_loader, val_loader, device, num_epochs=50, patience=5)
+    trained_model = train_model(
+        model,
+        train_loader,
+        val_loader,
+        device,
+        pos_weight=pos_weight,
+        num_epochs=50,
+        patience=5,
+    )
     calibrate_thresholds(trained_model, val_loader, device, file_manager)
     torch.save(trained_model.state_dict(), file_manager.model_file_path)
 
