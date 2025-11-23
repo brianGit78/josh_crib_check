@@ -43,9 +43,17 @@ def configure_logging(log_dir='logs', log_filename='train_gen.log'):
 
 
 def _hash_file(path: str) -> str:
-    # Use a content hash (SHA-1) so duplicate images with different filenames
-    # collapse to the same key. Reading in 8 KB chunks keeps memory usage low
-    # even for large files.
+    """
+    Compute a SHA-1 hash from the *bytes* of the image file, not its size,
+    dimensions, or filename.
+
+    Two images that happen to share the same file size or resolution but have
+    different pixel data will produce different hashes and will NOT be treated
+    as duplicates. Only byte-for-byte identical files collapse to the same
+    hash key.
+    """
+
+    # Read in 8 KB chunks to keep memory usage low even for large files.
     hasher = hashlib.sha1()
     with open(path, 'rb') as f:
         while True:
@@ -65,6 +73,11 @@ def deduplicate_imagefolder(dataset: ImageFolder, split_name: str) -> None:
     unique_samples = []
     hash_to_label = {}
     conflicts = 0
+
+    logging.info(
+        'Deduplicating %s split using SHA-1 content hashes (byte-for-byte identity only)',
+        split_name,
+    )
 
     for path, label in dataset.samples:
         file_hash = _hash_file(path)
