@@ -73,6 +73,7 @@ def deduplicate_imagefolder(dataset: ImageFolder, split_name: str) -> None:
     unique_samples = []
     hash_to_label = {}
     conflicts = 0
+    duplicate_same_label = 0
 
     logging.info(
         'Deduplicating %s split using SHA-1 content hashes (byte-for-byte identity only)',
@@ -90,15 +91,19 @@ def deduplicate_imagefolder(dataset: ImageFolder, split_name: str) -> None:
         elif hash_to_label[file_hash] != label:
             conflicts += 1
             logging.warning('Duplicate content with conflicting labels detected in %s: %s', split_name, path)
+        else:
+            duplicate_same_label += 1
 
     removed = len(dataset.samples) - len(unique_samples)
-    if removed > 0:
-        logging.info(
-            'Deduplicated %s split: removed %d exact duplicates (kept %d unique samples)',
-            split_name,
-            removed,
-            len(unique_samples)
-        )
+    logging.info(
+        'Deduplication summary for %s: %d total -> %d unique, %d removed (%d same-label, %d conflicting labels)',
+        split_name,
+        len(dataset.samples),
+        len(unique_samples),
+        removed,
+        duplicate_same_label,
+        conflicts,
+    )
     if conflicts:
         logging.warning('Found %d duplicate files with conflicting labels in %s; please double-check labeling.', conflicts, split_name)
 
