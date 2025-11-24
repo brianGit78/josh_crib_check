@@ -8,6 +8,8 @@ class FileManager:
         self.local_path_validation_data = os.path.join(self.local_path, model_name, "validation_data")
         self.model_file_name = model_name + ".pth"
         self.model_file_path = os.path.join(self.local_path, self.model_file_name)
+        self.thresholds_file_name = f"{model_name}_thresholds.json"
+        self.thresholds_file_path = os.path.join(self.local_path, self.thresholds_file_name)
         
     def create_local_directories(self):
         if not os.path.exists(self.local_path_training_data):
