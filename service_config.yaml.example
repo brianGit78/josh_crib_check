@@ -1,0 +1,9 @@
+# Configuration for real-time video processing service
+model_name: your_model_name
+rtsp_url: rtsp://your_camera_ip:port/stream_path
+
+# Home Assistant Integration
+home_assistant:
+  url: http://your_ha_ip:8123/api/
+  access_token: your_home_assistant_token
+  entity_id: input_boolean.your_entity

@@ -5,14 +5,15 @@ from logging.handlers import RotatingFileHandler
 import torch
 from PIL import Image
 
-import creds
+from config_loader import load_service_config
 from device_utils import describe_device, select_device
 from file_sync import FileManager
 from preprocessing import build_transforms
 from pt_cnn import CribMobileNet
 from toggle_josh_crib import JoshAlertAsync
 
-file_manager = FileManager(creds.model_name)
+config = load_service_config()
+file_manager = FileManager(config['model_name'])
 # Configure logging
 if not os.path.exists('logs'):
     os.makedirs('logs')
@@ -83,17 +84,17 @@ def connect_stream(url):
 
 async def cv_proc():
     josh_alert = JoshAlertAsync(
-        home_assistant_url=creds.home_assistant_url,
-        ha_access_token=creds.ha_access_token,
-        ha_entity_id=creds.ha_entity_id,
+        home_assistant_url=config['home_assistant']['url'],
+        ha_access_token=config['home_assistant']['access_token'],
+        ha_entity_id=config['home_assistant']['entity_id'],
         update_interval=120,
     )
-    
+
     # Start periodic state checker
     await josh_alert.start_periodic_check()
 
     # Connect to RTSP stream
-    cap = connect_stream(creds.rtsp_url)
+    cap = connect_stream(config['rtsp_url'])
 
     threshold_on, threshold_off = load_thresholds(default_on=0.8, default_off=0.6)
     check_interval = 3
@@ -108,7 +109,7 @@ async def cv_proc():
             if not ret:
                 logging.error(f"{datetime.datetime.now()} - Failed to read frame. Reconnecting...")
                 cap.release()
-                cap = connect_stream(creds.rtsp_url)
+                cap = connect_stream(config['rtsp_url'])
                 continue
 
             current_time = time.time()

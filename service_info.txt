@@ -1,0 +1,15 @@
+# josh_crib_video_proc.service
+[Unit]
+Description=Real Time Video Processing Service
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/brian/josh_crib_check/
+ExecStart=/usr/bin/python3.10 /home/brian/josh_crib_check/real_time_vid_proc.py
+Restart=always
+User=brian
+Group=brian
+
+[Install]
+WantedBy=multi-user.target

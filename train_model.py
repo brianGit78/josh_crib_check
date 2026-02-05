@@ -17,7 +17,9 @@ from device_utils import describe_device, select_device
 from file_sync import FileManager
 from preprocessing import build_transforms
 from pt_cnn import CribMobileNet
-import creds
+from config_loader import load_train_config
+
+config = load_train_config()
 
 parser = argparse.ArgumentParser(description="Training script")
 parser.add_argument("--skip_source_sync", action="store_true", help="Skip source sync")
@@ -189,20 +191,17 @@ def create_file_manager():
     """
     creation_start = time.time()
     logging.info('Initializing FileManager')
-    file_manager = FileManager(creds.model_name)
+    file_manager = FileManager(config['model_name'])
     file_manager.create_local_directories()
 
     if not args.skip_source_sync:
         file_sync_start_time = time.time()
         logging.info('Syncing source files')
-        file_manager.sync_source(creds.nas_user, creds.nas_password, creds.nas_host, creds.nas_path)
-
-        logging.info('Copying static validation images')
-        file_manager.copy_static_validation_data(
-            creds.nas_user,
-            creds.nas_password,
-            creds.nas_host,
-            creds.static_validation_path
+        file_manager.sync_source(
+            config['nas']['user'],
+            config['nas']['password'],
+            config['nas']['host'],
+            config['nas']['path']
         )
 
         logging.info('Splitting data ramdomly for validation')

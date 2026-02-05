@@ -1,0 +1,9 @@
+# Configuration for model training
+model_name: your_model_name
+
+# NAS Connection for Training Data
+nas:
+  host: your_nas_ip
+  user: your_username
+  password: your_password
+  path: /path/to/training/data

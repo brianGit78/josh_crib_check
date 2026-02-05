@@ -10,3 +10,5 @@ creds_care_chair.py
 *.keras
 *.pth
 logs
+service_config.yaml
+train_config.yaml
